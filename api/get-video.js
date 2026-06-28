@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 export default async function handler(req, res) {
-    // CORS এনাবল করা (যাতে অন্য কেউ আপনার API ব্যবহার না করতে পারে)
+    // CORS এনাবল করা
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET');
 
@@ -11,30 +11,42 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: "দয়া করে একটি লিংক দিন।" });
     }
 
-    try {
-        // একটি থার্ড-পার্টি ফ্রি Terabox Bypass API ব্যবহার করা হচ্ছে
-        // (ইন্টারনেটে থাকা যেকোনো ফ্রি API লিংক আপনি এখানে বসাতে পারবেন)
-        const bypassApiUrl = `https://terabox-dl.omind.site/api?url=${encodeURIComponent(url)}`;
-        
-        const response = await axios.get(bypassApiUrl);
-        const data = response.data;
-        
-        // এপিআই থেকে ডিরেক্ট লিংকটি খুঁজে নেওয়া 
-        // (API অনুযায়ী রেসপন্স ভিন্ন হতে পারে, তাই কয়েকটি লজিক দেওয়া হলো)
-        const directLink = data?.direct_link || data?.url || (data?.[0] && data[0]?.url);
+    // আমরা ৩টি ভিন্ন ফ্রি বাইপাস সার্ভার ব্যবহার করব (যেকোনো একটি কাজ করবেই আশা করা যায়)
+    const apiList = [
+        `https://terabox-dl.omind.site/api?url=${encodeURIComponent(url)}`,
+        `https://api.terabox-downloader.com/api/get?url=${encodeURIComponent(url)}`,
+        `https://terabox-api.vercel.app/api?url=${encodeURIComponent(url)}`
+    ];
 
-        if (directLink) {
-            // ডিরেক্ট লিংক পাওয়া গেলে সেটি ফ্রন্টএন্ডে পাঠানো হবে
-            return res.status(200).json({ 
-                success: true, 
-                directUrl: directLink 
-            });
-        } else {
-            return res.status(404).json({ success: false, error: "ভিডিওর আসল লিংকটি খুঁজে পাওয়া যায়নি।" });
+    let lastError = "অজানা এরর";
+
+    // লুপ চালিয়ে একটির পর একটি API চেক করা হবে
+    for (let i = 0; i < apiList.length; i++) {
+        try {
+            // ৮ সেকেন্ড পর্যন্ত অপেক্ষা করবে, রেসপন্স না পেলে পরেরটায় চলে যাবে
+            const response = await axios.get(apiList[i], { timeout: 8000 }); 
+            const data = response.data;
+            
+            // বিভিন্ন API এর লিংক দেওয়ার স্টাইল ভিন্ন হয়, তাই সবগুলোর জন্য চেক করা হচ্ছে
+            const directLink = data?.direct_link || data?.url || data?.downloadLink || (data?.[0] && data[0]?.url) || (data?.response && data.response[0]?.link);
+
+            // যদি ডিরেক্ট লিংক পাওয়া যায়, তবে সাথে সাথে ফ্রন্টএন্ডে পাঠিয়ে লুপ বন্ধ করে দেবে
+            if (directLink && directLink.startsWith('http')) {
+                return res.status(200).json({ 
+                    success: true, 
+                    directUrl: directLink 
+                });
+            }
+        } catch (error) {
+            // যদি এই API কাজ না করে, তাহলে এররটি সেভ করে পরের API ট্রাই করবে
+            lastError = error.response ? `Status ${error.response.status}` : error.message;
+            continue; 
         }
+    }
 
-    } catch (error) {
-        console.error("API Error:", error.message);
-        return res.status(500).json({ success: false, error: "বাইপাস সার্ভারের সাথে কানেক্ট করতে সমস্যা হচ্ছে।" });
-    }
-    }
+    // যদি কোনো দুর্ভাগ্যবশত সবগুলো API ফেইল করে, তখন আমরা ফ্রন্টএন্ডে আসল এররটি দেখাব
+    return res.status(500).json({ 
+        success: false, 
+        error: "এই মুহূর্তে সব ফ্রি সার্ভার ডাউন আছে। (আসল এরর: " + lastError + ")" 
+    });
+}
