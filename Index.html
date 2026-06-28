@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeraPlayer - Ad Free</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background-color: #0f172a; 
+            color: white; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+        }
+        .player-container { 
+            width: 100%; 
+            max-width: 700px; 
+            background: #1e293b; 
+            padding: 25px; 
+            border-radius: 15px; 
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); 
+            text-align: center; 
+        }
+        h2 { margin-top: 0; color: #38bdf8; }
+        .input-group { 
+            display: flex; 
+            gap: 10px; 
+            margin-bottom: 20px; 
+        }
+        input { 
+            flex: 1; 
+            padding: 12px; 
+            border: 1px solid #334155; 
+            border-radius: 8px; 
+            background: #0f172a; 
+            color: white; 
+            outline: none; 
+        }
+        button { 
+            padding: 12px 25px; 
+            background: #38bdf8; 
+            color: #0f172a; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: bold; 
+        }
+        button:hover { background: #0284c7; color: white; }
+        video { 
+            width: 100%; 
+            border-radius: 10px; 
+            background: #000; 
+            display: none; /* প্রথমে ভিডিও প্লেয়ার লুকানো থাকবে */
+        }
+        .loading { display: none; color: #38bdf8; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="player-container">
+        <h2>TeraPlayer</h2>
+        <div class="input-group">
+            <input type="text" id="videoLink" placeholder="টেরাবক্স লিংক পেস্ট করুন...">
+            <button onclick="fetchAndPlay()">Play</button>
+        </div>
+        
+        <div id="loadingText" class="loading">লিংক প্রসেস করা হচ্ছে, দয়া করে অপেক্ষা করুন...</div>
+        
+        <video id="myPlayer" controls>
+            <source id="videoSource" src="" type="video/mp4">
+        </video>
+    </div>
+
+    <script>
+        async function fetchAndPlay() {
+            const linkInput = document.getElementById('videoLink').value;
+            const video = document.getElementById('myPlayer');
+            const source = document.getElementById('videoSource');
+            const loading = document.getElementById('loadingText');
+            
+            if(linkInput.trim() === "") {
+                alert("দয়া করে বক্সে একটি লিংক দিন!");
+                return;
+            }
+
+            // লোডিং টেক্সট দেখানো এবং প্লেয়ার লুকানো
+            loading.style.display = "block";
+            video.style.display = "none";
+
+            try {
+                // আপনার ভারসেল API-তে রিকোয়েস্ট পাঠানো
+                const response = await fetch(`/api/get-video?url=${encodeURIComponent(linkInput)}`);
+                const data = await response.json();
+
+                if(data.success) {
+                    source.src = data.directUrl;
+                    video.style.display = "block"; // প্লেয়ার শো করা
+                    video.load(); 
+                    video.play(); 
+                } else {
+                    alert("এরর: " + data.error);
+                }
+            } catch (error) {
+                alert("সার্ভারের সাথে কানেক্ট করতে সমস্যা হচ্ছে।");
+            } finally {
+                // কাজ শেষ হলে লোডিং টেক্সট বন্ধ করা
+                loading.style.display = "none";
+            }
+        }
+    </script>
+
+</body>
+</html>
